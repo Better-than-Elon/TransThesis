@@ -1,0 +1,2 @@
+pip install "git+https://github.com/denisyarats/dmc2gym.git"
+pip install numpy==1.22.4

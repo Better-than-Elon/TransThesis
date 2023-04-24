@@ -139,3 +139,44 @@ class TransitionModel(nn.Module):
         statePrime_value = self.statePrime(x)
 
         return statePrime_value
+    
+    
+class FeedForwardNet_v2_dist(nn.Module):
+    def __init__(self, in_dim, in2_dim, out_dim, hidden_size=32):
+        super(FeedForwardNet_v2_dist, self).__init__()
+
+        self.in_dim = in_dim
+        self.in2_dim = in2_dim
+        
+        self.fcs = nn.Sequential(nn.Linear(in_dim, hidden_size), nn.Tanh(), nn.Linear(hidden_size, hidden_size), nn.Tanh())
+        
+        self.fcq = nn.Sequential(nn.Linear(in2_dim, hidden_size), nn.Tanh())
+        
+        self.fcm = nn.Sequential(nn.Linear(2*hidden_size, hidden_size), nn.Tanh())
+        
+        self.action_mean = nn.Linear(hidden_size, out_dim)
+        self.action_mean.weight.data.mul_(0.1)
+        self.action_mean.bias.data.mul_(0.0)
+
+        self.log_std = nn.Parameter(torch.zeros(1, out_dim))
+
+    def forward(self, state, noise):
+        
+        s = self.fcs(state)
+        q = self.fcq(noise)
+        x = torch.cat((s,q),dim=1)
+        x = self.fcm(x)
+        
+        action_mean = self.action_mean(x)
+        action_log_std = self.log_std.expand_as(action_mean)
+        action_std = torch.exp(action_log_std)
+
+        return action_mean, action_log_std, action_std
+    
+    
+    def act(self, x, noise):
+        with torch.no_grad():
+            #action_mean, _, action_std = self.forward(torch.tensor(x).unsqueeze(0), torch.tensor(noise).unsqueeze(0))
+            action_mean, _, action_std = self.forward(torch.tensor(x), torch.tensor(noise))
+            action = torch.normal(action_mean, action_std)
+        return action
